@@ -1,3 +1,40 @@
 {
-  "sites": {}
+  "sites": {
+    "https://reftrack.nl": {
+      "down": {
+        "failures": 0,
+        "status": "ok"
+      },
+      "keyword": {
+        "failures": 0,
+        "status": "ok"
+      },
+      "slow": {
+        "failures": 0,
+        "status": "ok"
+      },
+      "ssl": {
+        "failures": 0,
+        "status": "ok"
+      }
+    },
+    "https://wachtwoordvriend.nl": {
+      "down": {
+        "failures": 0,
+        "status": "ok"
+      },
+      "keyword": {
+        "failures": 0,
+        "status": "ok"
+      },
+      "slow": {
+        "failures": 0,
+        "status": "ok"
+      },
+      "ssl": {
+        "failures": 0,
+        "status": "ok"
+      }
+    }
+  }
 }
