@@ -2,7 +2,7 @@ name: Uptime-monitor
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "3-59/10 * * * *"  # elke 10 min, op 3/13/23/.. i.p.v. de drukke :00/:10/:20
   workflow_dispatch:
 
 permissions:
