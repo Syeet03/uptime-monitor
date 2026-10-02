@@ -16,6 +16,8 @@ import yaml
 BASE = Path(__file__).parent
 CONFIG_PATH = BASE / "config.yaml"
 STATE_PATH = BASE / "state.json"
+HISTORY_PATH = BASE / "history.json"
+HISTORY_DAYS = 90
 USER_AGENT = "uptime-monitor/1.0 (+github-actions)"
 
 DEFAULTS = {
@@ -48,6 +50,36 @@ def load_state(path=STATE_PATH):
 def save_state(state, path=STATE_PATH):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True, ensure_ascii=False)
+        f.write("\n")
+
+
+# --- geschiedenis (voor uptime-percentages) ----------------------------
+
+def load_history(path=HISTORY_PATH):
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        data.setdefault("sites", {})
+        return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"sites": {}}
+
+
+def record_history(history, url, up, today, keep_days=HISTORY_DAYS):
+    """Telt per site per dag [aantal checks, aantal keer online]. up=None telt niet mee."""
+    if up is None:
+        return
+    days = history["sites"].setdefault(url, {})
+    checks, ok = days.get(today, [0, 0])
+    days[today] = [checks + 1, ok + (1 if up else 0)]
+    for day in sorted(days)[:-keep_days]:
+        del days[day]
+
+
+def save_history(history, now, path=HISTORY_PATH):
+    history["updated"] = now
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(history, f, separators=(",", ":"), sort_keys=True)
         f.write("\n")
 
 
@@ -157,14 +189,18 @@ def send_ntfy(server, topic, msg):
     r.raise_for_status()
 
 
-def process(sites, settings, state, checker=check_site, notifier=None):
-    """Draait alle checks en werkt state bij. Geeft aantal verstuurde meldingen."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+def process(sites, settings, state, checker=check_site, notifier=None, history=None, now=None):
+    """Draait alle checks en werkt state (en optioneel history) bij. Geeft aantal verstuurde meldingen."""
+    now = now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     sent = 0
     for site in sites:
         threshold = site.get("failures_before_alert", settings["failures_before_alert"])
         site_state = state["sites"].setdefault(site["url"], {})
-        for check, (ok, detail) in checker(site, settings).items():
+        results = checker(site, settings)
+        if history is not None:
+            down_ok = results.get("down", (None, ""))[0]
+            record_history(history, site["url"], down_ok, now[:10])
+        for check, (ok, detail) in results.items():
             if ok is None:
                 continue
             new, event = transition(site_state.get(check), ok, detail, threshold, now)
@@ -192,8 +228,11 @@ def main():
         print("Waarschuwing: NTFY_TOPIC is niet ingesteld, er worden geen meldingen verstuurd.", file=sys.stderr)
     state = load_state()
     state.setdefault("sites", {})
-    process(sites, settings, state, notifier=notifier)
+    history = load_history()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    process(sites, settings, state, notifier=notifier, history=history, now=now)
     save_state(state)
+    save_history(history, now)
 
 
 if __name__ == "__main__":

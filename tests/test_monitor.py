@@ -96,3 +96,26 @@ def test_state_blijft_stabiel_bij_wisselende_details():
     probleem = copy.deepcopy(state)
     _, state = run([{"down": (False, "HTTP 502")}, DOWN], state=state)
     assert state == probleem
+
+
+# --- geschiedenis ---
+
+def test_geschiedenis_telt_per_dag():
+    h = {"sites": {}}
+    for up in (True, True, False):
+        monitor.process([SITE], SETTINGS, {"sites": {}}, checker=lambda s, st, u=up: {"down": (u, "")},
+                        notifier=lambda m: None, history=h, now="2026-10-02T10:00:00Z")
+    assert h["sites"][SITE["url"]]["2026-10-02"] == [3, 2]
+
+
+def test_geschiedenis_slaat_onbepaald_over():
+    h = {"sites": {}}
+    monitor.record_history(h, "u", None, "2026-10-02")
+    assert h["sites"] == {}
+
+
+def test_geschiedenis_houdt_max_dagen():
+    h = {"sites": {}}
+    for d in range(1, 31):
+        monitor.record_history(h, "u", True, f"2026-09-{d:02d}", keep_days=7)
+    assert sorted(h["sites"]["u"]) == [f"2026-09-{d:02d}" for d in range(24, 31)]
