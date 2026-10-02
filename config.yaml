@@ -15,3 +15,7 @@ sites:
   - name: Wachtwoordvriend
     url: https://wachtwoordvriend.nl
     keyword: Wachtwoordvriend
+
+  - name: lucasvanpelt.com
+    url: https://lucasvanpelt.com
+    keyword: Lucas van Pelt

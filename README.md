@@ -46,6 +46,14 @@ Ga naar **Settings → Actions → General → Workflow permissions** en kies **
 
 Push de bestanden naar GitHub. Ga daarna naar **Actions → Uptime-monitor → Run workflow** om direct een run te starten. Daarna draait hij vanzelf elke 10 minuten.
 
+## Uptime-geschiedenis
+
+Naast `state.json` houdt de monitor `history.json` bij: per site per dag het aantal checks en hoe vaak de site online was (HTTP 200), voor de laatste 90 dagen. Daarmee kun je bijvoorbeeld "99,9% online in de laatste 30 dagen" tonen.
+
+- Elke run werkt de geschiedenis bij; tussendoor bewaart de Actions-cache de nieuwste versie.
+- Hooguit één keer per uur wordt `history.json` gecommit, zodat de repo niet volloopt met commits.
+- Een check die niet te bepalen is (bijvoorbeeld een netwerkfout aan de kant van GitHub) telt niet mee.
+
 ## Een site toevoegen
 
 Voeg een blokje toe aan `config.yaml`:

@@ -26,6 +26,15 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # De geschiedenis wordt elke run bijgewerkt, maar maar één keer per uur gecommit.
+      # Tussendoor bewaart de cache de nieuwste versie.
+      - name: Geschiedenis ophalen
+        uses: actions/cache@v4
+        with:
+          path: history.json
+          key: history-${{ github.run_id }}
+          restore-keys: history-
+
       - name: Sites controleren
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
@@ -36,9 +45,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state.json
+          # Geschiedenis hooguit één keer per uur committen (minder commits)
+          last=$(git log -1 --format=%ct -- history.json 2>/dev/null || echo 0)
+          if [ $(( $(date +%s) - ${last:-0} )) -ge 3300 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            git add history.json
+          fi
           if git diff --cached --quiet; then
             echo "Geen statuswijziging, niets te committen."
           else
             git commit -m "Status bijgewerkt"
+            git pull --rebase --autostash || true
             git push
           fi
