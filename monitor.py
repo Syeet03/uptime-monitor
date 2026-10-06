@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Uptime-monitor: controleert sites en meldt statuswijzigingen via ntfy.sh."""
+"""Uptime monitor: checks sites and reports status changes via ntfy.sh."""
 import json
 import os
 import socket
@@ -35,7 +35,7 @@ def load_config(path=CONFIG_PATH):
     settings = {**DEFAULTS, **(cfg.get("settings") or {})}
     sites = cfg.get("sites") or []
     if not sites:
-        raise SystemExit("config.yaml bevat geen sites")
+        raise SystemExit("config.yaml contains no sites")
     return settings, sites
 
 
@@ -53,7 +53,7 @@ def save_state(state, path=STATE_PATH):
         f.write("\n")
 
 
-# --- geschiedenis (voor uptime-percentages) ----------------------------
+# --- history (for uptime percentages) -------------------------------------
 
 def load_history(path=HISTORY_PATH):
     try:
@@ -66,7 +66,7 @@ def load_history(path=HISTORY_PATH):
 
 
 def record_history(history, url, up, today, keep_days=HISTORY_DAYS):
-    """Telt per site per dag [aantal checks, aantal keer online]. up=None telt niet mee."""
+    """Counts per site per day [number of checks, number of times up]. up=None is not counted."""
     if up is None:
         return
     days = history["sites"].setdefault(url, {})
@@ -86,7 +86,7 @@ def save_history(history, now, path=HISTORY_PATH):
 # --- checks ---------------------------------------------------------------
 
 def ssl_days_left(host, port=443, timeout=10):
-    """Dagen tot het certificaat verloopt (kan negatief zijn)."""
+    """Days until the certificate expires (can be negative)."""
     ctx = ssl.create_default_context()
     with socket.create_connection((host, port), timeout=timeout) as sock:
         with ctx.wrap_socket(sock, server_hostname=host) as tls:
@@ -96,7 +96,7 @@ def ssl_days_left(host, port=443, timeout=10):
 
 
 def check_site(site, s):
-    """Geeft {check: (ok, detail)}. ok=None betekent: niet te bepalen, sla over."""
+    """Returns {check: (ok, detail)}. ok=None means: could not be determined, skip."""
     url = site["url"]
     results = {}
     timeout = site.get("timeout", s["timeout"])
@@ -115,15 +115,15 @@ def check_site(site, s):
             results["down"] = (False, f"HTTP {r.status_code}")
     except requests.RequestException as e:
         elapsed = None
-        results["down"] = (False, f"geen antwoord: {type(e).__name__}")
+        results["down"] = (False, f"no response: {type(e).__name__}")
 
     if page_ok:
         slow = site.get("slow_seconds", s["slow_seconds"])
-        results["slow"] = (elapsed <= slow, f"{elapsed:.2f}s (grens {slow}s)")
+        results["slow"] = (elapsed <= slow, f"{elapsed:.2f}s (limit {slow}s)")
         keyword = site.get("keyword")
         if keyword:
             found = keyword.lower() in text.lower()
-            results["keyword"] = (found, f"trefwoord '{keyword}' {'gevonden' if found else 'NIET gevonden'}")
+            results["keyword"] = (found, f"keyword '{keyword}' {'found' if found else 'NOT found'}")
     else:
         results["slow"] = (None, "")
         results["keyword"] = (None, "")
@@ -133,21 +133,21 @@ def check_site(site, s):
         warn = site.get("ssl_warn_days", s["ssl_warn_days"])
         try:
             days = ssl_days_left(parsed.hostname, parsed.port or 443, timeout)
-            results["ssl"] = (days >= warn, f"certificaat nog {days:.0f} dagen geldig (grens {warn})")
+            results["ssl"] = (days >= warn, f"certificate valid for {days:.0f} more days (limit {warn})")
         except ssl.SSLCertVerificationError as e:
-            results["ssl"] = (False, f"certificaat ongeldig of verlopen: {e.verify_message}")
+            results["ssl"] = (False, f"certificate invalid or expired: {e.verify_message}")
         except (OSError, ssl.SSLError):
-            results["ssl"] = (None, "")  # verbindingsprobleem: dat meldt 'down' al
+            results["ssl"] = (None, "")  # connection problem: 'down' already reports that
     return results
 
 
-# --- statuswijzigingen ----------------------------------------------------
+# --- status changes ---------------------------------------------------------
 
 def transition(prev, ok, detail, threshold, now):
-    """Bepaalt nieuwe state voor één check en eventueel een event.
+    """Determines the new state for one check and an optional event.
 
-    prev: vorige state (of None bij eerste run). Geeft (new_state, event),
-    event is None, 'problem' of 'recovery'.
+    prev: previous state (or None on the first run). Returns (new_state, event),
+    where event is None, 'problem' or 'recovery'.
     """
     prev = prev or {"status": "ok", "failures": 0}
     if ok:
@@ -155,24 +155,24 @@ def transition(prev, ok, detail, threshold, now):
             return {"status": "ok", "failures": 0, "since": now}, "recovery"
         return {"status": "ok", "failures": 0, **({"since": prev["since"]} if "since" in prev else {})}, None
     if prev["status"] == "problem":
-        return prev, None  # ongewijzigd, zodat state.json niet steeds verandert
+        return prev, None  # unchanged, so state.json does not change on every run
     failures = prev.get("failures", 0) + 1
     if failures >= threshold:
         return {"status": "problem", "failures": failures, "since": now}, "problem"
     return {**prev, "failures": failures}, None
 
 
-LABELS = {"down": "Storing", "slow": "Traag", "ssl": "SSL-certificaat", "keyword": "Trefwoord"}
+LABELS = {"down": "Outage", "slow": "Slow", "ssl": "SSL certificate", "keyword": "Keyword"}
 
 
 def build_message(site, check, event, detail):
     name = site.get("name", site["url"])
     label = LABELS[check]
     if event == "recovery":
-        return {"title": f"Hersteld: {name} ({label})", "body": f"{name} is weer in orde.\n{detail}\n{site['url']}",
+        return {"title": f"Recovered: {name} ({label})", "body": f"{name} is back to normal.\n{detail}\n{site['url']}",
                 "priority": "default", "tags": "white_check_mark"}
     hard = check in ("down", "keyword")
-    return {"title": f"{'STORING' if hard else 'Waarschuwing'}: {name} ({label})",
+    return {"title": f"{'DOWN' if hard else 'Warning'}: {name} ({label})",
             "body": f"{detail}\n{site['url']}",
             "priority": "urgent" if check == "down" else ("high" if hard else "default"),
             "tags": "rotating_light" if hard else "warning"}
@@ -190,7 +190,7 @@ def send_ntfy(server, topic, msg):
 
 
 def process(sites, settings, state, checker=check_site, notifier=None, history=None, now=None):
-    """Draait alle checks en werkt state (en optioneel history) bij. Geeft aantal verstuurde meldingen."""
+    """Runs all checks and updates state (and optionally history). Returns the number of notifications sent."""
     now = now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     sent = 0
     for site in sites:
@@ -207,16 +207,16 @@ def process(sites, settings, state, checker=check_site, notifier=None, history=N
             if event:
                 msg = build_message(site, check, event, detail)
                 if notifier is None:
-                    print(f"[geen NTFY_TOPIC] zou melden: {msg['title']}", file=sys.stderr)
-                    continue  # state niet bijwerken: volgende run opnieuw proberen
+                    print(f"[no NTFY_TOPIC] would notify: {msg['title']}", file=sys.stderr)
+                    continue  # do not update state: retry on the next run
                 try:
                     notifier(msg)
                     sent += 1
                 except requests.RequestException as e:
-                    print(f"Melding mislukt ({msg['title']}): {e}", file=sys.stderr)
+                    print(f"Notification failed ({msg['title']}): {e}", file=sys.stderr)
                     continue
             site_state[check] = new
-            print(f"{site.get('name', site['url'])} [{check}]: {'ok' if ok else 'PROBLEEM'} - {detail}")
+            print(f"{site.get('name', site['url'])} [{check}]: {'ok' if ok else 'PROBLEM'} - {detail}")
     return sent
 
 
@@ -225,7 +225,7 @@ def main():
     topic = os.environ.get("NTFY_TOPIC", "").strip()
     notifier = (lambda m: send_ntfy(settings["ntfy_server"], topic, m)) if topic else None
     if not topic:
-        print("Waarschuwing: NTFY_TOPIC is niet ingesteld, er worden geen meldingen verstuurd.", file=sys.stderr)
+        print("Warning: NTFY_TOPIC is not set, no notifications will be sent.", file=sys.stderr)
     state = load_state()
     state.setdefault("sites", {})
     history = load_history()

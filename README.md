@@ -45,7 +45,7 @@ Go to **Settings → Actions → General → Workflow permissions** and choose *
 
 ### 4. Start
 
-Push the files to GitHub. Then go to **Actions → Uptime-monitor → Run workflow** to start a run right away. After that it runs automatically every 10 minutes.
+Push the files to GitHub. Then go to **Actions → Uptime monitor → Run workflow** to start a run right away. After that it runs automatically every 10 minutes.
 
 ## Uptime history
 
