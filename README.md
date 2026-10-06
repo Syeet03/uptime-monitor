@@ -1,96 +1,97 @@
-# Uptime-monitor
+# Uptime Monitor
 
-Een kleine monitor in Python die om de 10 minuten je websites controleert en je een melding stuurt via [ntfy.sh](https://ntfy.sh) zodra er iets verandert. De monitor draait gratis op GitHub Actions; je hebt geen eigen server nodig.
+A small Python monitor that checks your websites every 10 minutes and sends you a notification via [ntfy.sh](https://ntfy.sh) as soon as something changes. It runs for free on GitHub Actions, so you don't need your own server.
 
-## Wat wordt gecontroleerd?
+## What is checked?
 
-| Check | Wanneer is het een probleem? | Soort melding |
+| Check | When is it a problem? | Notification level |
 |---|---|---|
-| **Storing** | HTTP-statuscode is niet 200, of er komt geen antwoord (timeout, verbindingsfout) | urgent |
-| **Trefwoord** | het opgegeven trefwoord staat niet op de pagina (hoofdletterongevoelig) | hoog |
-| **Traag** | responstijd boven `slow_seconds` (standaard 3 s) | waarschuwing |
-| **SSL-certificaat** | certificaat verloopt binnen `ssl_warn_days` (standaard 14 dagen) of is ongeldig | waarschuwing |
+| **Outage** | HTTP status code is not 200, or there is no response (timeout, connection error) | urgent |
+| **Keyword** | the configured keyword does not appear on the page (case-insensitive) | high |
+| **Slow** | response time above `slow_seconds` (default 3 s) | warning |
+| **SSL certificate** | certificate expires within `ssl_warn_days` (default 14 days) or is invalid | warning |
 
-Je krijgt **alleen een melding bij een statuswijziging**: één bericht als iets misgaat en één herstelmelding als het weer goed is. Een storing die een uur duurt geeft dus twee berichten, geen zes per uur. Elke check wordt apart bijgehouden, dus "traag" en "storing" zijn onafhankelijke meldingen.
+You **only get a notification when the status changes**: one message when something goes wrong and one recovery message when it's fixed. An outage that lasts an hour therefore gives you two messages, not six per hour. Each check is tracked separately, so "slow" and "outage" are independent notifications.
 
-## Bestanden
+## Files
 
-| Bestand | Doel |
+| File | Purpose |
 |---|---|
-| `config.yaml` | sites en instellingen |
-| `monitor.py` | de monitor |
-| `state.json` | laatst bekende status (wordt automatisch bijgewerkt, niet handmatig aanpassen) |
-| `.github/workflows/monitor.yml` | GitHub Actions-workflow |
+| `config.yaml` | sites and settings |
+| `monitor.py` | the monitor |
+| `state.json` | last known status (updated automatically, don't edit by hand) |
+| `history.json` | daily uptime history per site (updated automatically) |
+| `.github/workflows/monitor.yml` | GitHub Actions workflow |
 | `tests/` | tests |
 
-## Instellen
+## Setup
 
-### 1. ntfy kiezen
+### 1. Choose an ntfy topic
 
-1. Installeer de ntfy-app op je telefoon (Android/iOS) of open <https://ntfy.sh/app>.
-2. Kies een **lastig te raden topicnaam**, bijvoorbeeld `uptime-x7k2q9-mijnnaam`. Bij ntfy.sh kan iedereen die de naam kent meelezen en berichten sturen. De topicnaam werkt dus als een wachtwoord.
-3. Abonneer je in de app op dat topic.
+1. Install the ntfy app on your phone (Android/iOS) or open <https://ntfy.sh/app>.
+2. Pick a **hard-to-guess topic name**, for example `uptime-x7k2q9-yourname`. On ntfy.sh, anyone who knows the name can read and send messages, so the topic name works like a password.
+3. Subscribe to that topic in the app.
 
-### 2. Topic als secret opslaan
+### 2. Store the topic as a secret
 
-Omdat deze repo publiek is, zet je de topicnaam **niet** in de code of in `config.yaml`, maar in een GitHub-secret:
+Because this repo is public, **don't** put the topic name in the code or in `config.yaml`. Store it as a GitHub secret instead:
 
-1. Ga in je repo naar **Settings → Secrets and variables → Actions → New repository secret**.
-2. Naam: `NTFY_TOPIC`. Waarde: je topicnaam.
+1. In your repo, go to **Settings → Secrets and variables → Actions → New repository secret**.
+2. Name: `NTFY_TOPIC`. Value: your topic name.
 
-### 3. Schrijfrechten voor de workflow
+### 3. Give the workflow write access
 
-Ga naar **Settings → Actions → General → Workflow permissions** en kies **Read and write permissions**. De workflow vraagt zelf al `contents: write` aan, maar een organisatie of repo kan dit overrulen. Dit is nodig om `state.json` terug te committen.
+Go to **Settings → Actions → General → Workflow permissions** and choose **Read and write permissions**. The workflow already requests `contents: write` itself, but an organisation or repository setting can override this. Write access is needed to commit `state.json` and `history.json` back to the repo.
 
-### 4. Starten
+### 4. Start
 
-Push de bestanden naar GitHub. Ga daarna naar **Actions → Uptime-monitor → Run workflow** om direct een run te starten. Daarna draait hij vanzelf elke 10 minuten.
+Push the files to GitHub. Then go to **Actions → Uptime-monitor → Run workflow** to start a run right away. After that it runs automatically every 10 minutes.
 
-## Uptime-geschiedenis
+## Uptime history
 
-Naast `state.json` houdt de monitor `history.json` bij: per site per dag het aantal checks en hoe vaak de site online was (HTTP 200), voor de laatste 90 dagen. Daarmee kun je bijvoorbeeld "99,9% online in de laatste 30 dagen" tonen.
+Besides `state.json`, the monitor keeps `history.json`: for each site and each day, the number of checks and how many of them were successful (HTTP 200), for the last 90 days. You can use this to show something like "99.9% uptime over the last 30 days".
 
-- Elke run werkt de geschiedenis bij; tussendoor bewaart de Actions-cache de nieuwste versie.
-- Hooguit één keer per uur wordt `history.json` gecommit, zodat de repo niet volloopt met commits.
-- Een check die niet te bepalen is (bijvoorbeeld een netwerkfout aan de kant van GitHub) telt niet mee.
+- Every run updates the history; in between, the Actions cache keeps the latest version.
+- `history.json` is committed at most once an hour, so the repo doesn't fill up with commits. A manually started run (**Run workflow**) always commits it.
+- A check that can't be determined (for example a network error on GitHub's side) is not counted.
 
-## Een site toevoegen
+## Adding a site
 
-Voeg een blokje toe aan `config.yaml`:
+Add a block to `config.yaml`:
 
 ```yaml
 sites:
-  - name: Mijn nieuwe site
-    url: https://voorbeeld.nl
-    keyword: Welkom          # optioneel
-    slow_seconds: 5          # optioneel: overschrijft de standaard voor alleen deze site
+  - name: My new site
+    url: https://example.com
+    keyword: Welcome         # optional
+    slow_seconds: 5          # optional: overrides the default for this site only
 ```
 
-Optionele instellingen per site: `keyword`, `timeout`, `slow_seconds`, `ssl_warn_days`, `failures_before_alert`.
+Optional per-site settings: `keyword`, `timeout`, `slow_seconds`, `ssl_warn_days`, `failures_before_alert`.
 
-**Let op:** kies een trefwoord dat echt in de HTML van de pagina staat. Staat de tekst pas na het laden via JavaScript op de pagina, dan vindt de monitor hem niet en krijg je een valse melding.
+**Note:** choose a keyword that is actually in the page's HTML. If the text only appears after JavaScript has loaded, the monitor won't find it and you'll get a false alert.
 
-## Valse alarmen beperken
+## Fewer false alarms
 
-Zet `failures_before_alert: 2` in `config.yaml`. Een site moet dan twee checks achter elkaar mislukken (dus ongeveer 10 minuten) voor je een melding krijgt. Een kort haperinkje van één check blijft dan onopgemerkt. Standaard staat dit op 1 (direct melden).
+Set `failures_before_alert: 2` in `config.yaml`. A site then has to fail two checks in a row (about 10 minutes) before you get a notification, so a single short hiccup goes unnoticed. The default is 1 (alert immediately).
 
-## Zelf testen
+## Testing locally
 
-Je hebt Python 3.10 of nieuwer nodig.
+You need Python 3.10 or newer.
 
 ```bash
 pip install -r requirements.txt pytest
-pytest                                 # tests voor de meldlogica
-python monitor.py                      # echte check; zonder NTFY_TOPIC worden geen meldingen verstuurd
-NTFY_TOPIC=mijn-testtopic python monitor.py   # met meldingen (op Windows PowerShell: $env:NTFY_TOPIC="mijn-testtopic")
+pytest                                 # tests for the alerting logic
+python monitor.py                      # real check; without NTFY_TOPIC no notifications are sent
+NTFY_TOPIC=my-test-topic python monitor.py   # with notifications (Windows PowerShell: $env:NTFY_TOPIC="my-test-topic")
 ```
 
-Let op: `python monitor.py` schrijft ook `state.json`. Zonder `NTFY_TOPIC` wordt de status van een probleem niet opgeslagen, zodat de melding bij de eerstvolgende run met topic alsnog komt. Wil je een schone start, zet dan de inhoud van `state.json` terug naar `{"sites": {}}`.
+Note: `python monitor.py` also writes `state.json` and `history.json`. Without `NTFY_TOPIC`, a problem status is not saved, so the notification is still sent on the next run that does have a topic. For a clean start, reset `state.json` to `{"sites": {}}` and `history.json` to `{"sites": {}}`.
 
-## Goed om te weten
+## Good to know
 
-- **Timing is niet exact.** GitHub start geplande workflows soms pas 5 tot 15 minuten later, vooral op drukke momenten. "Elke 10 minuten" is dus een streven.
-- **Geplande workflows kunnen na 60 dagen zonder activiteit worden uitgezet.** GitHub doet dit in repo's waar niets gebeurt. Omdat de monitor alleen commit bij een statuswijziging, kan een rustige repo in die situatie komen. Merk je dat de meldingen wegblijven, kijk dan onder **Actions** of de workflow nog actief is en zet hem zo nodig weer aan. Een commit (bijvoorbeeld een kleine README-wijziging) per maand houdt hem actief.
-- **`state.json` is publiek.** Hij bevat alleen de site-URL's, ok/probleem en het tijdstip van de laatste wijziging, dus geen geheimen. Wel kan iedereen zien wanneer je sites storing hadden.
-- **Mislukt het versturen van een melding**, dan wordt de status niet opgeslagen en probeert de volgende run het opnieuw.
-- **Kan de monitor zelf niet bij ntfy of GitHub**, dan hoor je niets. Voor kritieke sites is een tweede, onafhankelijke monitor een goede aanvulling.
+- **Timing isn't exact.** GitHub sometimes starts scheduled workflows 5 to 15 minutes late, especially at busy times. "Every 10 minutes" is a target, not a guarantee.
+- **Scheduled workflows can be disabled after 60 days without activity.** GitHub does this in repositories where nothing happens. The hourly `history.json` commits normally keep the repo active, but if notifications stop arriving, check under **Actions** whether the workflow is still enabled and turn it back on if needed.
+- **`state.json` and `history.json` are public.** They only contain the site URLs, ok/problem status, daily check counts and timestamps, so no secrets. Anyone can, however, see when your sites had problems.
+- **If sending a notification fails**, the status is not saved and the next run tries again.
+- **If the monitor itself can't reach ntfy or GitHub**, you won't hear anything. For critical sites, a second, independent monitor is a good addition.
