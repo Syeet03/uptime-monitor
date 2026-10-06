@@ -1,8 +1,8 @@
-name: Uptime-monitor
+name: Uptime monitor
 
 on:
   schedule:
-    - cron: "3-59/10 * * * *"  # elke 10 min, op 3/13/23/.. i.p.v. de drukke :00/:10/:20
+    - cron: "3-59/10 * * * *"  # every 10 min, at :03/:13/:23/.. instead of the busy :00/:10/:20
   workflow_dispatch:
 
 permissions:
@@ -26,34 +26,34 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # De geschiedenis wordt elke run bijgewerkt, maar maar één keer per uur gecommit.
-      # Tussendoor bewaart de cache de nieuwste versie.
-      - name: Geschiedenis ophalen
+      # The history is updated on every run but committed at most once an hour.
+      # In between, the cache keeps the latest version.
+      - name: Restore history
         uses: actions/cache@v4
         with:
           path: history.json
           key: history-${{ github.run_id }}
           restore-keys: history-
 
-      - name: Sites controleren
+      - name: Check sites
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python monitor.py
 
-      - name: Status opslaan in de repo
+      - name: Save status to the repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state.json
-          # Geschiedenis hooguit één keer per uur committen (minder commits)
+          # Commit the history at most once an hour (fewer commits)
           last=$(git log -1 --format=%ct -- history.json 2>/dev/null || echo 0)
           if [ $(( $(date +%s) - ${last:-0} )) -ge 3300 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             git add history.json
           fi
           if git diff --cached --quiet; then
-            echo "Geen statuswijziging, niets te committen."
+            echo "No status change, nothing to commit."
           else
-            git commit -m "Status bijgewerkt"
+            git commit -m "Update status"
             git pull --rebase --autostash || true
             git push
           fi

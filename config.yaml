@@ -1,16 +1,16 @@
-# Instellingen voor alle sites (elke waarde kan ook per site worden overschreven)
+# Settings for all sites (every value can also be overridden per site)
 settings:
-  timeout: 15               # seconden wachten op een antwoord
-  slow_seconds: 3           # waarschuwing boven deze responstijd
-  ssl_warn_days: 14         # waarschuwing als het certificaat binnen zoveel dagen verloopt
-  failures_before_alert: 1  # aantal opeenvolgende mislukte checks voor een melding (2 = minder valse alarmen)
+  timeout: 15               # seconds to wait for a response
+  slow_seconds: 3           # warn above this response time
+  ssl_warn_days: 14         # warn when the certificate expires within this many days
+  failures_before_alert: 1  # consecutive failed checks before a notification (2 = fewer false alarms)
   ntfy_server: https://ntfy.sh
 
-# Een site toevoegen = een blokje erbij.
+# To add a site, add a block below.
 sites:
   - name: RefTrack
     url: https://reftrack.nl
-    keyword: RefTrack        # tekst die op de pagina moet staan (hoofdletterongevoelig); weglaten = niet controleren
+    keyword: RefTrack        # text that must appear on the page (case-insensitive); omit to skip this check
 
   - name: Wachtwoordvriend
     url: https://wachtwoordvriend.nl
