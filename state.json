@@ -47,9 +47,9 @@
         "status": "ok"
       },
       "slow": {
-        "failures": 0,
-        "since": "2026-10-12T02:30:31Z",
-        "status": "ok"
+        "failures": 1,
+        "since": "2026-10-12T17:00:45Z",
+        "status": "problem"
       },
       "ssl": {
         "failures": 0,
