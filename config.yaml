@@ -16,6 +16,10 @@ sites:
     url: https://wachtwoordvriend.nl
     keyword: Wachtwoordvriend
 
+  - name: Handtekeningvriend
+    url: https://handtekeningvriend.nl
+    keyword: Handtekeningvriend
+
   - name: lucasvanpelt.com
     url: https://lucasvanpelt.com
     keyword: Lucas van Pelt
